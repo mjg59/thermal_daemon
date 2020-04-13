@@ -30,6 +30,8 @@ cthd_sensor::cthd_sensor(int _index, std::string control_path,
 		index(_index), type(_type), sensor_sysfs(control_path.c_str()), sensor_active(
 				false), type_str(_type_str), async_capable(false), virtual_sensor(
 				false), thresholds(0), scale(1) {
+	if (control_path.empty())
+		thd_log_warn("Missing control_path for sensor id %d (type: %s)\n", index, type_str.c_str());
 
 }
 
