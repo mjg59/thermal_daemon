@@ -1,7 +1,7 @@
-From eb21b9ee48cffafdbc0731967d35a118153db053 Mon Sep 17 00:00:00 2001
+From b9228317f0743c137a58af9e90ca9ab828da2fa8 Mon Sep 17 00:00:00 2001
 From: Matthew Garrett <mjg59@google.com>
 Date: Sat, 11 Apr 2020 17:00:43 -0700
-Subject: [PATCH 2/2] thermal/int340x_thermal: Export OEM vendor variables
+Subject: [PATCH 2/3] thermal/int340x_thermal: Export OEM vendor variables
 
 The platform vendor may expose an array of OEM-specific values to be used
 in determining DPTF policy. These are obtained via the ODVP method, and
@@ -10,11 +10,11 @@ notification is received or when the DPTF policy is changed by userland.
 
 Signed-off-by: Matthew Garrett <mjg59@google.com>
 ---
- .../intel/int340x_thermal/int3400_thermal.c   | 134 +++++++++++++++++-
- 1 file changed, 133 insertions(+), 1 deletion(-)
+ .../intel/int340x_thermal/int3400_thermal.c   | 132 +++++++++++++++++-
+ 1 file changed, 131 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/thermal/intel/int340x_thermal/int3400_thermal.c b/drivers/thermal/intel/int340x_thermal/int3400_thermal.c
-index 5785c0b09e54..97047e687448 100644
+index 00a7732724cd..3919098a73b4 100644
 --- a/drivers/thermal/intel/int340x_thermal/int3400_thermal.c
 +++ b/drivers/thermal/intel/int340x_thermal/int3400_thermal.c
 @@ -13,6 +13,7 @@
@@ -55,7 +55,7 @@ index 5785c0b09e54..97047e687448 100644
  };
  
  static ssize_t data_vault_read(struct file *file, struct kobject *kobj,
-@@ -210,9 +225,112 @@ static int int3400_thermal_run_osc(acpi_handle handle,
+@@ -210,9 +225,110 @@ static int int3400_thermal_run_osc(acpi_handle handle,
  		result = -EPERM;
  
  	kfree(context.ret.pointer);
@@ -72,7 +72,7 @@ index 5785c0b09e54..97047e687448 100644
 +
 +	return sprintf(buf, "%d\n", odvp_attr->priv->odvp[odvp_attr->odvp]);
 +}
-+	
++
 +static void cleanup_odvp(struct int3400_thermal_priv *priv)
 +{
 +	int i;
@@ -110,7 +110,7 @@ index 5785c0b09e54..97047e687448 100644
 +
 +	if (priv->odvp == NULL) {
 +		priv->odvp_count = obj->package.count;
-+		priv->odvp = kmalloc(sizeof(int) * priv->odvp_count,
++		priv->odvp = kmalloc_array(priv->odvp_count, sizeof(int),
 +				     GFP_KERNEL);
 +		if (!priv->odvp) {
 +			ret = -ENOMEM;
@@ -129,7 +129,7 @@ index 5785c0b09e54..97047e687448 100644
 +		for (i = 0; i < priv->odvp_count; i++) {
 +			struct odvp_attr *odvp = &priv->odvp_attrs[i];
 +
-+			sysfs_attr_init(attr->attr);
++			sysfs_attr_init(&odvp->attr.attr);
 +			odvp->priv = priv;
 +			odvp->odvp = i;
 +			odvp->attr.attr.name = kasprintf(GFP_KERNEL,
@@ -144,16 +144,14 @@ index 5785c0b09e54..97047e687448 100644
 +			odvp->attr.store = NULL;
 +			ret = sysfs_create_file(&priv->pdev->dev.kobj,
 +						&odvp->attr.attr);
-+			if (ret) {
++			if (ret)
 +				goto out_err;
-+			}
 +		}
 +	}
 +
 +	for (i = 0; i < obj->package.count; i++) {
-+		if (obj->package.elements[i].type == ACPI_TYPE_INTEGER) {
++		if (obj->package.elements[i].type == ACPI_TYPE_INTEGER)
 +			priv->odvp[i] = obj->package.elements[i].integer.value;
-+		}
 +	}
 +
 +	kfree(obj);
@@ -168,7 +166,7 @@ index 5785c0b09e54..97047e687448 100644
  static void int3400_notify(acpi_handle handle,
  			u32 event,
  			void *data)
-@@ -236,6 +354,9 @@ static void int3400_notify(acpi_handle handle,
+@@ -236,6 +352,9 @@ static void int3400_notify(acpi_handle handle,
  		kobject_uevent_env(&priv->thermal->device.kobj, KOBJ_CHANGE,
  				thermal_prop);
  		break;
@@ -178,7 +176,7 @@ index 5785c0b09e54..97047e687448 100644
  	default:
  		/* Ignore unknown notification codes sent to INT3400 device */
  		break;
-@@ -285,6 +406,9 @@ static int int3400_thermal_set_mode(struct thermal_zone_device *thermal,
+@@ -285,6 +404,9 @@ static int int3400_thermal_set_mode(struct thermal_zone_device *thermal,
  						 priv->current_uuid_index,
  						 enable);
  	}
@@ -188,7 +186,7 @@ index 5785c0b09e54..97047e687448 100644
  	return result;
  }
  
-@@ -313,6 +437,7 @@ static int int3400_thermal_probe(struct platform_device *pdev)
+@@ -336,6 +458,7 @@ static int int3400_thermal_probe(struct platform_device *pdev)
  	if (!priv)
  		return -ENOMEM;
  
@@ -196,16 +194,16 @@ index 5785c0b09e54..97047e687448 100644
  	priv->adev = adev;
  
  	result = int3400_thermal_get_uuids(priv);
-@@ -331,6 +456,8 @@ static int int3400_thermal_probe(struct platform_device *pdev)
+@@ -356,6 +479,8 @@ static int int3400_thermal_probe(struct platform_device *pdev)
  
- 	platform_set_drvdata(pdev, priv);
+ 	int3400_setup_gddv(priv);
  
 +	evaluate_odvp(priv);
 +
- 	status = acpi_evaluate_object(priv->adev->handle, "GDDV", NULL, &buffer);
- 	if (ACPI_SUCCESS(status) && buffer.length) {
- 		obj = buffer.pointer;
-@@ -377,8 +504,11 @@ static int int3400_thermal_probe(struct platform_device *pdev)
+ 	int3400_thermal_ops.get_mode = int3400_thermal_get_mode;
+ 	int3400_thermal_ops.set_mode = int3400_thermal_set_mode;
+ 
+@@ -390,8 +515,11 @@ static int int3400_thermal_probe(struct platform_device *pdev)
  	return 0;
  
  free_sysfs:
@@ -218,7 +216,7 @@ index 5785c0b09e54..97047e687448 100644
  free_uuid:
  	sysfs_remove_group(&pdev->dev.kobj, &uuid_attribute_group);
  free_rel_misc:
-@@ -401,6 +531,8 @@ static int int3400_thermal_remove(struct platform_device *pdev)
+@@ -414,6 +542,8 @@ static int int3400_thermal_remove(struct platform_device *pdev)
  			priv->adev->handle, ACPI_DEVICE_NOTIFY,
  			int3400_notify);
  
