@@ -123,28 +123,35 @@ int cthd_sysfs_cdev_rapl::get_max_state() {
 int cthd_sysfs_cdev_rapl::rapl_sysfs_valid()
 {
 	std::stringstream temp_str;
-	int found = 0;
+	int found_long_term = 0;
+	int found_short_term = 0;
 	int i;
 
 	// The primary control is powercap rapl long_term control
 	// If absent we can't use rapl cooling device
 	for (i = 0; i < rapl_no_time_windows; ++i) {
+		temp_str.str(std::string());
 		temp_str << "constraint_" << i << "_name";
 		if (cdev_sysfs.exists(temp_str.str())) {
 			std::string type_str;
 			cdev_sysfs.read(temp_str.str(), type_str);
 			if (type_str == "long_term") {
 				constraint_index = i;
-				found = 1;
+				found_long_term = 1;
 			}
 			if (type_str == "short_term") {
 				pl2_index = i;
+				found_short_term = 1;
 			}
 		}
 	}
 
-	if (!found) {
+	if (!found_long_term) {
 		thd_log_info("powercap RAPL no long term time window\n");
+		return THD_ERROR;
+	}
+	if (!found_short_term) {
+		thd_log_info("powercap RAPL no short term time window\n");
 		return THD_ERROR;
 	}
 
